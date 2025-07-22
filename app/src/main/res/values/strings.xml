@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Калькулятор покрытий</string>
+    <string name="calculator_title">Калькулятор</string>
+    <string name="admin_title">Админ</string>
+    <string name="calculate_button">Рассчитать стоимость</string>
+    <string name="login_button">Войти как администратор</string>
+    <string name="change_password">Изменить пароль</string>
+    <string name="price_management">Управление ценами</string>
+
+    <!-- Строки для CalculationAdapter -->
+    <string name="area_format">Площадь: %.1f м²</string>
+    <string name="coverage_format">%1$s • %2$s мм • %3$s</string>
+    <string name="price_with_coefficient">Цена: %.0f ₽/м² (с коэф.)</string>
+    <string name="final_cost_format">%.0f ₽</string>
+    <string name="consultation_required">⚠️ Требуется консультация</string>
+    <string name="contact_manager">Свяжитесь с менеджером</string>
+    <string name="copy_button_text">📄 Копировать</string>
+    <string name="delete_button_text">🗑️ Удалить</string>
+
+    <!-- Строки для результатов расчета -->
+    <string name="calculation_complete">✓ Расчет выполнен</string>
+    <string name="area_result">Площадь: %.1f м²</string>
+    <string name="base_price_result">Базовая цена: %.0f ₽/м²</string>
+    <string name="coefficient_price_result">Цена с коэф.: %.0f ₽/м²</string>
+    <string name="total_cost_result">Общая стоимость: %.0f ₽</string>
+    <string name="warning_attention">⚠️ Внимание!</string>
+    <string name="contact_manager_message">Обратитесь к менеджеру для уточнения стоимости</string>
+
+    <!-- Уведомления о копировании -->
+    <string name="cost_copied_consultation">Стоимость скопирована: 0 (требуется консультация)</string>
+    <string name="cost_copied_format">Стоимость скопирована: %.0f ₽</string>
+
+    <!-- Строки для PriceAdapter -->
+    <string name="thickness_format">%s мм</string>
+    <string name="price_per_sqm">₽/м²</string>
+
+    <!-- Строки для CalculatorFragment -->
+    <string name="area_hint">Площадь (м²)</string>
+    <string name="default_area">50.0</string>
+    <string name="coverage_type_label">Тип покрытия</string>
+    <string name="thickness_label">Толщина</string>
+    <string name="region_label">Регион</string>
+    <string name="thickness_unit">%s мм</string>
+
+    <!-- Уведомления -->
+    <string name="calculation_error">Ошибка при расчете: %s</string>
+    <string name="calculation_deleted">Расчет удален</string>
+</resources>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Базовая тема приложения -->
+    <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Основные цвета -->
+        <item name="colorPrimary">#10B981</item>
+        <item name="colorPrimaryVariant">#059669</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+
+        <!-- Вторичные цвета -->
+        <item name="colorSecondary">#10B981</item>
+        <item name="colorSecondaryVariant">#059669</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+
+        <!-- Цвета ошибок -->
+        <item name="colorError">#EF4444</item>
+        <item name="colorOnError">#FFFFFF</item>
+
+        <!-- Цвета будут переопределены в values-night -->
+        <item name="android:colorBackground">@color/background_color</item>
+        <item name="colorOnBackground">@color/on_background_color</item>
+        <item name="colorSurface">@color/surface_color</item>
+        <item name="colorOnSurface">@color/on_surface_color</item>
+        <item name="colorSurfaceVariant">@color/surface_variant_color</item>
+        <item name="colorOutline">@color/outline_color</item>
+
+        <!-- Настройки статус бара -->
+        <item name="android:statusBarColor">@color/status_bar_color</item>
+        <item name="android:windowLightStatusBar">@bool/light_status_bar</item>
+        <item name="android:navigationBarColor">@color/navigation_bar_color</item>
+    </style>
+</resources>
