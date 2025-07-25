@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Калькулятор покрытий</string>
+    <string name="app_name">ДиКалькулятор</string>
     <string name="calculator_title">Калькулятор</string>
     <string name="admin_title">Админ</string>
     <string name="calculate_button">Рассчитать стоимость</string>
@@ -42,6 +42,88 @@
     <string name="thickness_label">Толщина</string>
     <string name="region_label">Регион</string>
     <string name="thickness_unit">%s мм</string>
+
+    <!-- Строки для AdminFragment -->
+    <string name="admin_panel_title">Панель администратора</string>
+    <string name="admin_panel_subtitle">Управление ценами и настройками системы</string>
+    <string name="login_required_message">Для доступа к панели управления необходима авторизация</string>
+    <string name="login_as_admin">Войти как администратор</string>
+    <string name="system_management">Управление системой</string>
+    <string name="change_password_button">Сменить пароль</string>
+    <string name="clear_history_button">Очистить историю</string>
+    <string name="reset_prices_button">Сбросить цены к умолчанию</string>
+    <string name="price_management_title">Управление ценами</string>
+    <string name="price_management_description">Редактируйте цены для различных типов покрытий и толщин (₽ за м²)</string>
+    <string name="save_changes">Сохранить изменения</string>
+    <string name="save_changes_with_icon">💾 Сохранить изменения</string>
+    <string name="all_saved">✓ Все сохранено</string>
+
+    <!-- Диалоги AdminFragment -->
+    <string name="admin_panel_dialog_title">Административная панель</string>
+    <string name="enter_admin_password">Введите пароль администратора</string>
+    <string name="admin_password_hint">Пароль администратора</string>
+    <string name="login_dialog_button">Войти</string>
+    <string name="cancel_dialog_button">Отмена</string>
+    <string name="change_password_dialog_title">Смена пароля Supabase</string>
+    <string name="current_password_hint">Текущий пароль</string>
+    <string name="new_password_hint">Новый пароль</string>
+    <string name="confirm_password_hint">Подтвердите новый пароль</string>
+    <string name="change_password_dialog_button">Изменить</string>
+
+    <!-- Сообщения AdminFragment -->
+    <string name="enter_password_toast">Введите пароль</string>
+    <string name="wrong_password_toast">Неверный пароль</string>
+    <string name="no_admin_rights_toast">У вас нет прав администратора</string>
+    <string name="login_error_invalid_credentials">Неверный пароль</string>
+    <string name="login_error_network">Ошибка подключения к серверу</string>
+    <string name="login_error_general">Ошибка входа в систему: %s</string>
+    <string name="enter_current_password_toast">Введите текущий пароль</string>
+    <string name="password_min_length_toast">Новый пароль должен содержать минимум 6 символов</string>
+    <string name="passwords_not_match_toast">Пароли не совпадают</string>
+    <string name="password_must_differ_toast">Новый пароль должен отличаться от текущего</string>
+    <string name="wrong_current_password_toast">Неверный текущий пароль</string>
+    <string name="password_changed_success_toast">Пароль успешно изменен в Supabase!</string>
+    <string name="password_change_error_toast">Ошибка при смене пароля</string>
+    <string name="password_change_error_details_toast">Ошибка при смене пароля: %s</string>
+    <string name="logged_in_as_admin">✓ Вы вошли как администратор</string>
+    <string name="welcome_admin_toast">Добро пожаловать в админ-панель!</string>
+
+    <!-- Информационные диалоги -->
+    <string name="reset_prices_info_title">Сброс цен</string>
+    <string name="reset_prices_info_message">Функция сброса к дефолтным ценам недоступна.\nВсе цены управляются через Supabase.</string>
+    <string name="clear_history_info_title">Информация</string>
+    <string name="clear_history_info_message">История расчетов больше не сохраняется локально.\nВсе данные теперь работают только через облако Supabase.</string>
+    <string name="understand_button">Понятно</string>
+
+    <!-- Сообщения о загрузке и сохранении -->
+    <string name="loading_prices_from_cloud">Загрузка цен из облака...</string>
+    <string name="authorization_loading">Авторизация...</string>
+    <string name="checking_rights_loading">Проверка прав...</string>
+    <string name="no_prices_in_supabase_toast">В Supabase нет данных о ценах</string>
+    <string name="supabase_connection_error_toast">Ошибка подключения к Supabase: %s</string>
+    <string name="using_local_data_toast">Используются локальные данные</string>
+    <string name="relogin_required_toast">Ошибка: Необходимо войти в систему заново</string>
+    <string name="insufficient_admin_rights_toast">Ошибка: Недостаточно прав администратора</string>
+    <string name="changes_saved_supabase_toast">Изменения сохранены в Supabase (%s)!</string>
+    <string name="save_error_supabase_toast">Ошибка сохранения в Supabase</string>
+    <string name="save_error_insufficient_rights">Недостаточно прав администратора</string>
+    <string name="save_error_network">Ошибка подключения к серверу</string>
+    <string name="save_error_timeout">Превышено время ожидания</string>
+    <string name="save_error_general">Ошибка сохранения: %s</string>
+    <string name="version_format">версия %d</string>
+
+    <!-- Строки для MainActivity -->
+    <string name="app_title">Калькулятор покрытий</string>
+    <string name="connecting_to_cloud">Подключение к облаку...</string>
+    <string name="loading_data_from_supabase">Загрузка данных из Supabase...</string>
+    <string name="updating_data">Обновление данных...</string>
+    <string name="data_update_error">⚠️ Ошибка обновления данных</string>
+    <string name="no_internet_local_mode">📱 Нет подключения к интернету - работаем в локальном режиме</string>
+    <string name="cloud_connection_success">✅ Подключение к облаку успешно - %1$s (%2$s)</string>
+    <string name="cloud_connected_local_prices">⚠️ Подключено к облаку, но используются локальные цены (%s)</string>
+    <string name="cloud_connection_failed_local_mode">⚠️ Не удалось подключиться к облаку - работаем в локальном режиме</string>
+    <string name="online_mode_text">Онлайн режим</string>
+    <string name="local_mode_text">Локальный режим</string>
 
     <!-- Уведомления -->
     <string name="calculation_error">Ошибка при расчете: %s</string>

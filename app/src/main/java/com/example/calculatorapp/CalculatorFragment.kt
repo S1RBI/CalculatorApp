@@ -3,6 +3,10 @@ package com.example.calculatorapp
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import android.text.InputType
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -24,6 +28,11 @@ import android.content.ClipboardManager
 import android.content.Context
 import java.util.Locale
 import androidx.core.graphics.toColorInt
+import androidx.core.content.edit
+import com.example.calculatorapp.utils.InputValidator
+import com.example.calculatorapp.utils.Logger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class CalculatorFragment : Fragment() {
 
@@ -38,15 +47,18 @@ class CalculatorFragment : Fragment() {
 
     private lateinit var calculationAdapter: CalculationAdapter
     private lateinit var priceManager: PriceManager
-    private lateinit var historyManager: HistoryManager
+    private val historyList = mutableListOf<CoverageItem>()
+    private val maxHistorySize = 10 // Максимум 10 элементов в истории
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        priceManager = PriceManager(requireContext())
-        historyManager = HistoryManager(requireContext())
+        priceManager = PriceManager.getInstance(requireContext())
 
         val rootLayout = createMainLayout()
         setupRecyclerView()
         setupCalculateButton()
+
+        // Загружаем сохраненную историю
+        loadHistoryFromLocal()
         loadHistory()
 
         return rootLayout
@@ -348,27 +360,70 @@ class CalculatorFragment : Fragment() {
     }
 
     private fun performCalculation() {
-        try {
-            val area = areaInput.text.toString().toDoubleOrNull() ?: return
+        // Показываем индикатор загрузки
+        calculateButton.isEnabled = false
+        calculateButton.text = "Расчет..."
 
-            val thickness = extractThickness()
-            val coverageType = CoverageType.entries[coverageSpinner.selectedItemPosition]
-            val region = Region.entries[regionSpinner.selectedItemPosition]
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    // Валидация входных данных
+                    val areaText = areaInput.text.toString()
+                    val area = areaText.toDoubleOrNull()
 
-            val item = CoverageItem.createCalculation(
-                area = area,
-                thickness = thickness,
-                coverageType = coverageType,
-                region = region,
-                priceManager = priceManager
-            )
+                    if (area == null) {
+                        return@withContext ValidationError("Введите корректную площадь")
+                    }
 
-            showResult(item)
-            addToHistory(item)
+                    val areaValidation = InputValidator.validateArea(area)
+                    if (!areaValidation.isValid) {
+                        return@withContext ValidationError(areaValidation.errorMessage!!)
+                    }
 
-        } catch (e: Exception) {
-            Toast.makeText(requireContext(), "Ошибка при расчете: ${e.message}", Toast.LENGTH_SHORT).show()
+                    // Вся тяжелая работа в IO потоке
+                    val thickness = extractThickness()
+                    val coverageType = CoverageType.entries[coverageSpinner.selectedItemPosition]
+                    val region = Region.entries[regionSpinner.selectedItemPosition]
+
+                    val item = CoverageItem.createCalculation(
+                        area = area,
+                        thickness = thickness,
+                        coverageType = coverageType,
+                        region = region,
+                        context = requireContext()
+                    )
+
+                    return@withContext CalculationSuccess(item)
+                }
+
+                // Обновляем UI в главном потоке
+                when (result) {
+                    is CalculationSuccess -> {
+                        showResult(result.item)
+                        addToHistory(result.item)
+                    }
+                    is ValidationError -> {
+                        showError(result.message)
+                    }
+                }
+
+            } catch (e: Exception) {
+                Logger.e("CalculatorFragment", "Calculation error: ${e.message}", e)
+                showError("Ошибка при расчете: ${e.message}")
+            } finally {
+                calculateButton.isEnabled = true
+                calculateButton.text = "Рассчитать стоимость"
+            }
         }
+    }
+
+    // Sealed классы для результатов расчета
+    private sealed class CalculationResult
+    private data class CalculationSuccess(val item: CoverageItem) : CalculationResult()
+    private data class ValidationError(val message: String) : CalculationResult()
+
+    private fun showError(message: String) {
+        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
     }
 
     private fun extractThickness(): String {
@@ -412,13 +467,95 @@ class CalculatorFragment : Fragment() {
     }
 
     private fun addToHistory(item: CoverageItem) {
-        historyManager.saveCalculation(item)
+        // Добавляем в начало списка
+        historyList.add(0, item)
+
+        // Ограничиваем размер истории
+        if (historyList.size > maxHistorySize) {
+            historyList.removeAt(historyList.size - 1)
+        }
+
+        // Сохраняем историю локально
+        saveHistoryToLocal()
         loadHistory()
     }
 
     private fun loadHistory() {
-        val history = historyManager.getHistory()
-        calculationAdapter.submitList(history)
+        calculationAdapter.submitList(historyList.toList())
+    }
+
+    /**
+     * Асинхронно сохраняет историю в локальные SharedPreferences
+     */
+    private fun saveHistoryToLocal() {
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val sharedPrefs = requireContext().getSharedPreferences("calculator_history", Context.MODE_PRIVATE)
+                val gson = com.google.gson.Gson()
+
+                // Создаем data class для истории
+                val historyData = HistoryData(historyList.toList())
+                val json = gson.toJson(historyData)
+
+                sharedPrefs.edit {
+                    putString("history_data", json)
+                }
+
+            } catch (e: Exception) {
+                Logger.w("CalculatorFragment", "Failed to save history: ${e.message}")
+            }
+        }
+    }
+
+    // Data class для сериализации истории
+    @Parcelize
+    data class HistoryData(
+        val items: List<CoverageItem>
+    ) : Parcelable
+
+    /**
+     * Загружает историю из локальных SharedPreferences
+     */
+    private fun loadHistoryFromLocal() {
+        try {
+            val sharedPrefs = requireContext().getSharedPreferences("calculator_history", Context.MODE_PRIVATE)
+            val historyJson = sharedPrefs.getString("history_data", null)
+
+            if (historyJson != null) {
+                val gson = com.google.gson.Gson()
+                val jsonArray = gson.fromJson(historyJson, com.google.gson.JsonArray::class.java)
+
+                historyList.clear()
+
+                jsonArray.forEach { element ->
+                    val jsonObject = element.asJsonObject
+                    try {
+                        val item = CoverageItem(
+                            area = jsonObject.get("area").asDouble,
+                            thickness = jsonObject.get("thickness").asString,
+                            coverageType = CoverageType.valueOf(jsonObject.get("coverageType").asString),
+                            region = Region.valueOf(jsonObject.get("region").asString),
+                            basePrice = jsonObject.get("basePrice").asDouble,
+                            finalCost = jsonObject.get("finalCost").asDouble,
+                            hasError = jsonObject.get("hasError").asBoolean,
+                            errorMessage = jsonObject.get("errorMessage").asString,
+                            timestamp = jsonObject.get("timestamp").asLong
+                        )
+                        historyList.add(item)
+                    } catch (e: Exception) {
+                        Logger.w("CalculatorFragment", "Skipping corrupted history item: ${e.message}")
+                    }
+                }
+
+                // Ограничиваем размер после загрузки
+                if (historyList.size > maxHistorySize) {
+                    historyList.subList(maxHistorySize, historyList.size).clear()
+                }
+            }
+        } catch (e: Exception) {
+            Logger.w("CalculatorFragment", "Failed to load history from local storage: ${e.message}")
+            historyList.clear()
+        }
     }
 
     private fun copyCalculation(item: CoverageItem) {
@@ -470,7 +607,8 @@ class CalculatorFragment : Fragment() {
     }
 
     private fun deleteCalculation(item: CoverageItem) {
-        historyManager.removeCalculation(item)
+        historyList.removeAll { it.timestamp == item.timestamp }
+        saveHistoryToLocal() // Сохраняем изменения
         loadHistory()
         Toast.makeText(requireContext(), getString(R.string.calculation_deleted), Toast.LENGTH_SHORT).show()
     }

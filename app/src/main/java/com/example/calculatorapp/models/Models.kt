@@ -46,8 +46,9 @@ data class CoverageItem(
             thickness: String,
             coverageType: CoverageType,
             region: Region,
-            priceManager: PriceManager
+            context: android.content.Context
         ): CoverageItem {
+            val priceManager = PriceManager.getInstance(context)
             var hasError = false
             var errorMessage = ""
             var finalCost = 0.0
@@ -71,7 +72,7 @@ data class CoverageItem(
 
                 // Применяем коэффициенты по площади как в C# коде
                 when {
-                    area > 120 -> {
+                    area >= 120 -> {
                         // Свыше 120м² - без коэффициента (×1.0)
                         // cost остается без изменений
                     }

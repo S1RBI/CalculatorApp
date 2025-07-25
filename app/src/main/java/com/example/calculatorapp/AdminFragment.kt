@@ -18,8 +18,12 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.example.calculatorapp.utils.ThemeHelper
 import androidx.core.graphics.toColorInt
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class AdminFragment : Fragment() {
 
@@ -32,15 +36,11 @@ class AdminFragment : Fragment() {
 
     private lateinit var priceAdapter: PriceAdapter
     private lateinit var priceManager: PriceManager
-    private lateinit var passwordManager: PasswordManager
-    private lateinit var historyManager: HistoryManager
     private var isLoggedIn = false
     private var hasUnsavedChanges = false
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        priceManager = PriceManager(requireContext())
-        passwordManager = PasswordManager(requireContext())
-        historyManager = HistoryManager(requireContext())
+        priceManager = PriceManager.getInstance(requireContext())
 
         val rootLayout = createMainLayout()
         setupPriceAdapter()
@@ -254,9 +254,11 @@ class AdminFragment : Fragment() {
             typeface = android.graphics.Typeface.DEFAULT_BOLD
 
             setOnClickListener {
-                priceManager.resetToDefault()
-                loadPriceData()
-                Toast.makeText(requireContext(), "Цены сброшены к умолчанию", Toast.LENGTH_SHORT).show()
+                AlertDialog.Builder(requireContext())
+                    .setTitle("Сброс цен")
+                    .setMessage("Функция сброса к дефолтным ценам недоступна.\nВсе цены управляются через Supabase.")
+                    .setPositiveButton("Понятно", null)
+                    .show()
             }
         }
 
@@ -358,10 +360,51 @@ class AdminFragment : Fragment() {
         dialog.setView(dialogLayout)
             .setPositiveButton("Войти") { _, _ ->
                 val password = passwordInput.text.toString()
-                if (passwordManager.verifyPassword(password)) {
-                    loginSuccessful()
-                } else {
-                    Toast.makeText(requireContext(), "Неверный пароль", Toast.LENGTH_SHORT).show()
+
+                if (password.isEmpty()) {
+                    Toast.makeText(requireContext(), "Введите пароль", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                // Показываем прогресс диалог
+                val loadingDialog = createLoadingDialog("Авторизация...")
+                loadingDialog.show()
+
+                // Асинхронная авторизация через Supabase с фиксированным email
+                lifecycleScope.launch {
+                    try {
+                        // Получаем email администратора из конфигурации
+                        val adminEmail = com.example.calculatorapp.BuildConfig.ADMIN_EMAIL
+                        val success = com.example.calculatorapp.models.SupabaseAuthManager.signInAsync(adminEmail, password)
+
+                        loadingDialog.dismiss()
+
+                        if (success) {
+                            // Проверяем права администратора
+                            val checkingDialog = createLoadingDialog("Проверка прав...")
+                            checkingDialog.show()
+
+                            val isAdmin = com.example.calculatorapp.models.SupabasePriceManager.isCurrentUserAdmin()
+                            checkingDialog.dismiss()
+
+                            if (isAdmin) {
+                                loginSuccessful()
+                            } else {
+                                Toast.makeText(requireContext(), "У вас нет прав администратора", Toast.LENGTH_SHORT).show()
+                                com.example.calculatorapp.models.SupabaseAuthManager.signOutAsync()
+                            }
+                        } else {
+                            Toast.makeText(requireContext(), "Неверный пароль", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        loadingDialog.dismiss()
+                        val errorMessage = when {
+                            e.message?.contains("Invalid login credentials") == true -> "Неверный пароль"
+                            e.message?.contains("Network") == true -> "Ошибка подключения к серверу"
+                            else -> "Ошибка входа в систему: ${e.message}"
+                        }
+                        Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_LONG).show()
+                    }
                 }
             }
             .setNegativeButton("Отмена", null)
@@ -375,16 +418,24 @@ class AdminFragment : Fragment() {
         }
 
         val title = TextView(requireContext()).apply {
-            text = "Вход в админ-панель"
+            text = "Административная панель"
             textSize = 18f
             setTextColor("#111827".toColorInt())
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 48)
+            setPadding(0, 0, 0, 16)
+        }
+
+        val subtitle = TextView(requireContext()).apply {
+            text = "Введите пароль администратора"
+            textSize = 14f
+            setTextColor("#6B7280".toColorInt())
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 32)
         }
 
         val passwordLayout = TextInputLayout(requireContext()).apply {
-            hint = "Пароль"
+            hint = "Пароль администратора"
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -400,6 +451,7 @@ class AdminFragment : Fragment() {
 
         passwordLayout.addView(passwordInput)
         layout.addView(title)
+        layout.addView(subtitle)
         layout.addView(passwordLayout)
 
         return Pair(layout, passwordInput)
@@ -416,18 +468,43 @@ class AdminFragment : Fragment() {
                 val confirmPassword = confirmPasswordInput.text.toString()
 
                 when {
-                    !passwordManager.verifyPassword(currentPassword) -> {
-                        Toast.makeText(requireContext(), "Неверный текущий пароль", Toast.LENGTH_SHORT).show()
+                    currentPassword.isEmpty() -> {
+                        Toast.makeText(requireContext(), "Введите текущий пароль", Toast.LENGTH_SHORT).show()
                     }
-                    newPassword.length < 3 -> {
-                        Toast.makeText(requireContext(), "Пароль должен содержать минимум 3 символа", Toast.LENGTH_SHORT).show()
+                    newPassword.length < 6 -> {
+                        Toast.makeText(requireContext(), "Новый пароль должен содержать минимум 6 символов", Toast.LENGTH_SHORT).show()
                     }
                     newPassword != confirmPassword -> {
                         Toast.makeText(requireContext(), "Пароли не совпадают", Toast.LENGTH_SHORT).show()
                     }
+                    newPassword == currentPassword -> {
+                        Toast.makeText(requireContext(), "Новый пароль должен отличаться от текущего", Toast.LENGTH_SHORT).show()
+                    }
                     else -> {
-                        passwordManager.changePassword(newPassword)
-                        Toast.makeText(requireContext(), "Пароль успешно изменен", Toast.LENGTH_SHORT).show()
+                        // Асинхронная смена пароля через Supabase
+                        lifecycleScope.launch {
+                            try {
+                                // Получаем email администратора из конфигурации
+                                val adminEmail = com.example.calculatorapp.BuildConfig.ADMIN_EMAIL
+
+                                // Проверяем текущий пароль
+                                val currentPasswordValid = com.example.calculatorapp.models.SupabaseAuthManager.signInAsync(adminEmail, currentPassword)
+                                if (!currentPasswordValid) {
+                                    Toast.makeText(requireContext(), "Неверный текущий пароль", Toast.LENGTH_SHORT).show()
+                                    return@launch
+                                }
+
+                                // Меняем пароль
+                                val success = com.example.calculatorapp.models.SupabaseAuthManager.updatePasswordAsync(newPassword)
+                                if (success) {
+                                    Toast.makeText(requireContext(), "Пароль успешно изменен в Supabase!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(requireContext(), "Ошибка при смене пароля", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(requireContext(), "Ошибка при смене пароля: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
                     }
                 }
             }
@@ -442,12 +519,12 @@ class AdminFragment : Fragment() {
         }
 
         val title = TextView(requireContext()).apply {
-            text = "Смена пароля администратора"
+            text = "Смена пароля Supabase"
             textSize = 18f
             setTextColor("#111827".toColorInt())
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 48)
+            setPadding(0, 0, 0, 32)
         }
 
         val currentPasswordInput = createPasswordInput("Текущий пароль")
@@ -464,13 +541,9 @@ class AdminFragment : Fragment() {
 
     private fun showClearHistoryDialog() {
         AlertDialog.Builder(requireContext())
-            .setTitle("Очистить историю")
-            .setMessage("Вы уверены, что хотите удалить всю историю расчетов? Это действие нельзя отменить.")
-            .setPositiveButton("Удалить") { _, _ ->
-                historyManager.clearHistory()
-                Toast.makeText(requireContext(), "История очищена", Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton("Отмена", null)
+            .setTitle("Информация")
+            .setMessage("История расчетов больше не сохраняется локально.\nВсе данные теперь работают только через облако Supabase.")
+            .setPositiveButton("Понятно", null)
             .show()
     }
 
@@ -504,16 +577,64 @@ class AdminFragment : Fragment() {
         loginButton.strokeWidth = 0
 
         adminPanel.visibility = View.VISIBLE
-        loadPriceData()
+        loadPriceDataFromSupabase()
 
         Toast.makeText(requireContext(), "Добро пожаловать в админ-панель!", Toast.LENGTH_SHORT).show()
     }
 
-    private fun loadPriceData() {
-        val priceItems = priceManager.getAllPrices()
-        priceAdapter.submitList(priceItems)
-        hasUnsavedChanges = false
-        updateSaveButtonState()
+    private fun loadPriceDataFromSupabase() {
+        val loadingDialog = createLoadingDialog("Загрузка цен из облака...")
+        loadingDialog.show()
+
+        lifecycleScope.launch {
+            try {
+                // КРИТИЧНО: Получаем свежие данные прямо из Supabase
+                val freshPrices = com.example.calculatorapp.models.SupabasePriceManager.getFreshPricesFromSupabase()
+
+                loadingDialog.dismiss()
+
+                if (freshPrices.isNotEmpty()) {
+                    // Преобразуем свежие данные в PriceItem
+                    val priceItems = mutableListOf<com.example.calculatorapp.models.PriceItem>()
+                    freshPrices.forEach { (type, thicknessMap) ->
+                        thicknessMap.forEach { (thickness, price) ->
+                            priceItems.add(com.example.calculatorapp.models.PriceItem(type, thickness, price))
+                        }
+                    }
+
+                    // Сортируем как в оригинальном коде
+                    val sortedPrices = priceItems.sortedWith(compareBy({ it.type }, {
+                        if (it.thickness.contains("+")) {
+                            val parts = it.thickness.split("+")
+                            parts[0].toIntOrNull() ?: 0
+                        } else {
+                            it.thickness.toIntOrNull() ?: 0
+                        }
+                    }))
+
+                    priceAdapter.submitList(sortedPrices)
+                    hasUnsavedChanges = false
+                    updateSaveButtonState()
+
+                    val versionInfo = "версия ${com.example.calculatorapp.models.SupabasePriceManager.getCurrentVersion()}"
+                    // Убираем избыточные уведомления
+
+                } else {
+                    Toast.makeText(requireContext(), "В Supabase нет данных о ценах", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                loadingDialog.dismiss()
+                Toast.makeText(requireContext(), "Ошибка подключения к Supabase: ${e.message}", Toast.LENGTH_LONG).show()
+
+                // Fallback к дефолтным данным
+                val fallbackItems = priceManager.getAllPrices()
+                priceAdapter.submitList(fallbackItems)
+                hasUnsavedChanges = false
+                updateSaveButtonState()
+
+                Toast.makeText(requireContext(), "Используются локальные данные", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun updateSaveButtonState() {
@@ -532,17 +653,87 @@ class AdminFragment : Fragment() {
     private fun savePriceChanges() {
         val currentPrices = priceAdapter.getCurrentPrices()
 
-        // Сохраняем все изменения
-        for (priceItem in currentPrices) {
-            val coverageType = CoverageType.entries.find { it.displayName == priceItem.type }
-            if (coverageType != null) {
-                priceManager.updatePrice(coverageType, priceItem.thickness, priceItem.price)
+        lifecycleScope.launch {
+            try {
+                android.util.Log.d("AdminFragment", "Attempting to save ${currentPrices.size} price items...")
+
+                // Проверяем, что мы авторизованы
+                val isSignedIn = com.example.calculatorapp.models.SupabaseAuthManager.isSignedIn()
+                if (!isSignedIn) {
+                    Toast.makeText(requireContext(), "Ошибка: Необходимо войти в систему заново", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+
+                // Проверяем права администратора
+                val isAdmin = com.example.calculatorapp.models.SupabasePriceManager.isCurrentUserAdmin()
+                if (!isAdmin) {
+                    Toast.makeText(requireContext(), "Ошибка: Недостаточно прав администратора", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+
+                val success = priceManager.savePricesAsync(currentPrices)
+
+                if (success) {
+                    hasUnsavedChanges = false
+                    updateSaveButtonState()
+
+                    // КРИТИЧНО: Обновляем локальные данные после сохранения
+                    priceManager.forceRefreshFromSupabase()
+
+                    val versionInfo = "версия ${com.example.calculatorapp.models.SupabasePriceManager.getCurrentVersion()}"
+                    Toast.makeText(requireContext(), "Изменения сохранены в Supabase ($versionInfo)!", Toast.LENGTH_SHORT).show()
+
+                    android.util.Log.d("AdminFragment", "Successfully saved prices to Supabase")
+                } else {
+                    Toast.makeText(requireContext(), "Ошибка сохранения в Supabase", Toast.LENGTH_SHORT).show()
+                    android.util.Log.e("AdminFragment", "Failed to save prices to Supabase")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AdminFragment", "Error saving prices: ${e.message}")
+
+                val errorMessage = when {
+                    e.message?.contains("Недостаточно прав") == true -> "Недостаточно прав администратора"
+                    e.message?.contains("Network") == true -> "Ошибка подключения к серверу"
+                    e.message?.contains("timeout") == true -> "Превышено время ожидания"
+                    else -> "Ошибка сохранения: ${e.message}"
+                }
+
+                Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_LONG).show()
             }
         }
+    }
 
-        hasUnsavedChanges = false
-        updateSaveButtonState()
+    /**
+     * Создает диалог загрузки с анимацией
+     */
+    private fun createLoadingDialog(message: String): AlertDialog {
+        val dialogView = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(60, 40, 60, 40)
+        }
 
-        Toast.makeText(requireContext(), "Все изменения сохранены!", Toast.LENGTH_SHORT).show()
+        val progressBar = android.widget.ProgressBar(requireContext()).apply {
+            layoutParams = LinearLayout.LayoutParams(80, 80).apply {
+                bottomMargin = 24
+            }
+            isIndeterminate = true
+        }
+
+        val messageText = TextView(requireContext()).apply {
+            text = message
+            textSize = 16f
+            setTextColor(ThemeHelper.Colors.getTextPrimaryColor(requireContext()))
+            gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+
+        dialogView.addView(progressBar)
+        dialogView.addView(messageText)
+
+        return AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
     }
 }

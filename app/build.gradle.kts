@@ -1,3 +1,10 @@
+import java.util.Properties
+
+// Загружаем конфиденциальные данные из local.properties перед конфигурацией android
+val localProperties = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -16,11 +23,27 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Константы для BuildConfig
+        buildConfigField("String", "SUPABASE_URL",      "\"${localProperties.getProperty("SUPABASE_URL", "")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localProperties.getProperty("SUPABASE_ANON_KEY", "")}\"")
+        buildConfigField("String", "ADMIN_EMAIL",       "\"${localProperties.getProperty("ADMIN_EMAIL", "")}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
+        debug {
+            isDebuggable = true
+            buildConfigField("Boolean", "DEBUG_MODE", "true")
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isDebuggable = false
+            buildConfigField("Boolean", "DEBUG_MODE", "false")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -39,7 +62,6 @@ android {
 }
 
 dependencies {
-
     // Core Android
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
@@ -53,6 +75,15 @@ dependencies {
 
     // JSON
     implementation("com.google.code.gson:gson:2.10.1")
+
+    // Network
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // Coroutines & Lifecycle
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
